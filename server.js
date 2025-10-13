@@ -4,7 +4,7 @@ const cors = require("cors");
 require("dotenv").config();
 
 const productRoutes = require("./routes/ProductRoutes");
-const quoteRoutes = require("./routes/quote");
+const quoteRoutes = require("./routes/Quote");
 const emailRoutes = require("./routes/emailRoutes"); // ✅ NEW
 
 const app = express();
