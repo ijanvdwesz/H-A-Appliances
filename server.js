@@ -5,7 +5,7 @@ require("dotenv").config();
 
 const productRoutes = require("./routes/ProductRoutes");
 const quoteRoutes = require("./routes/Quote");
-const emailRoutes = require("./routes/emailRoutes"); // ✅ NEW
+const emailRoutes = require("./routes/EmailRoutes"); // ✅ NEW
 
 const app = express();
 app.use(cors());
