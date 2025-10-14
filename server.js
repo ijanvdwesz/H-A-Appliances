@@ -8,7 +8,16 @@ const quoteRoutes = require("./routes/Quote");
 const emailRoutes = require("./routes/EmailRoutes"); // ✅ NEW
 
 const app = express();
-app.use(cors());
+
+// ✅ CORS setup: allow your frontend domain + localhost for dev
+app.use(cors({
+  origin: [
+    "http://localhost:3000", // dev
+    "https://h-a-appliances-frontend-6vmckh47r.vercel.app" // production Vercel
+  ],
+  credentials: true,
+}));
+
 app.use(express.json());
 
 // Routes
@@ -24,6 +33,9 @@ mongoose
 
 // Root route
 app.get("/", (req, res) => res.send("Cold Company API running..."));
+
+// 404 catch-all
+app.use((req, res) => res.status(404).json({ message: "Endpoint not found" }));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
