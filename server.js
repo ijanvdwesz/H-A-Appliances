@@ -12,7 +12,7 @@ const app = express();
 app.use(cors({
   origin: [
      "http://localhost:3000", // dev
-    "https://h-a-appliances-frontend.vercel.app" // permanent production URL
+    "https://h-a-appliances.vercel.app" // permanent production URL
   ],
   credentials: true,
 }));
