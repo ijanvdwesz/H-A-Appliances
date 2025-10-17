@@ -5,15 +5,14 @@ require("dotenv").config();
 
 const productRoutes = require("./routes/ProductRoutes");
 const quoteRoutes = require("./routes/Quote");
-const emailRoutes = require("./routes/EmailRoutes"); // ✅ NEW
+const emailRoutes = require("./routes/EmailRoutes");
 
 const app = express();
 
-// ✅ CORS setup: allow your frontend domain + localhost for dev
 app.use(cors({
   origin: [
-    "http://localhost:3000", // dev
-    "https://h-a-appliances-frontend-6vmckh47r.vercel.app" // production Vercel
+     "http://localhost:3000", // dev
+    "https://h-a-appliances-frontend.vercel.app" // permanent production URL
   ],
   credentials: true,
 }));

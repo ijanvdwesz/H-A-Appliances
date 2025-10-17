@@ -1,28 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const nodemailer = require("nodemailer");
-const Quote = require("../models/Quote"); // ✅ Make sure you have this model created
-
-// Example model (models/Quote.js):
-// const mongoose = require("mongoose");
-// const QuoteSchema = new mongoose.Schema({
-//   services: [String],
-//   length: String,
-//   width: String,
-//   height: String,
-//   temperature: String,
-//   acRoomSize: String,
-//   acType: String,
-//   maintenanceType: String,
-//   maintenanceFreq: String,
-//   specialInstructions: String,
-//   name: String,
-//   email: String,
-//   phone: String,
-//   location: String,
-//   createdAt: { type: Date, default: Date.now }
-// });
-// module.exports = mongoose.model("Quote", QuoteSchema);
+const Quote = require("../models/Quote"); // ✅ 
 
 router.post("/", async (req, res) => {
   const data = req.body;
