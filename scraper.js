@@ -5,27 +5,29 @@ const slugify = require("slugify");
 const Product = require("./models/Product");
 const connectDB = require("./config/db");
 
-// 🔹 Helper: calculate adjusted price
+// Helper: calculate adjusted price
 function applyMarkup(price) {
   if (price >= 1000) return +(price * 1.15).toFixed(2);
   if (price >= 500) return +(price * 1.20).toFixed(2);
   return +(price * 1.30).toFixed(2);
 }
 
-// 🔹 Helper: upsert product with logging
+// Helper: upsert product
 async function saveOrUpdateProduct(prod) {
-  const existing = await Product.findOne({ slug: prod.slug });
+  try {
+    const updated = await Product.findOneAndUpdate(
+      { slug: prod.slug }, // always use slug
+      { $set: prod },
+      { upsert: true, new: true }
+    );
 
-  if (existing) {
-    await Product.updateOne({ slug: prod.slug }, { $set: prod });
-    console.log(`🔄 Updated existing product: ${prod.title} → R${prod.price}`);
-  } else {
-    await Product.create(prod);
-    console.log(`🆕 Added new product: ${prod.title} → R${prod.price}`);
+    console.log(`✅ Saved/Updated: ${prod.title} → R${prod.price.toFixed(2)}`);
+  } catch (err) {
+    console.error(`❌ Error saving product: ${prod.title}`, err.message);
   }
 }
 
-// 🔹 Scrape one category
+// Scrape category
 async function scrapeCategory(categoryUrl) {
   let page = 1;
   let totalScraped = 0;
@@ -48,15 +50,16 @@ async function scrapeCategory(categoryUrl) {
       $("li.product.type-product").each((i, el) => {
         const title = $(el).find("h2.woocommerce-loop-product__title").text().trim();
         const productUrl = $(el).find("a.woocommerce-LoopProduct-link").attr("href");
-        const priceText = $(el).find("span.woocommerce-Price-amount bdi").first().text().trim();
-        const price = parseFloat(priceText.replace(/[^0-9.]/g, "")) || 0;
+        let price = parseFloat($(el).find("span.woocommerce-Price-amount bdi").first().text().replace(/[^0-9.]/g, "")) || 0;
+        price = Number(price.toFixed(2));
+
         const image = $(el).find("img").attr("src") || "";
         const skuText = $(el).find(".product-sku").text().replace("SKU:", "").trim();
         const slug = slugify(title, { lower: true });
         const description = $(el).find(".product-short-description").text().trim() || "";
 
-        if (title && price) {
-          const adjustedPrice = applyMarkup(price);
+        if (title && price > 0) {
+          const adjustedPrice = Number(applyMarkup(price).toFixed(2));
 
           products.push({
             title,
@@ -73,14 +76,9 @@ async function scrapeCategory(categoryUrl) {
         }
       });
 
-      if (products.length === 0) {
-        console.log(`🚫 No products found on page ${page}, stopping.`);
-        break;
-      }
+      if (products.length === 0) break;
 
-      for (const prod of products) {
-        await saveOrUpdateProduct(prod);
-      }
+      for (const prod of products) await saveOrUpdateProduct(prod);
 
       totalScraped += products.length;
       console.log(`✅ Scraped ${products.length} products from page ${page}`);
@@ -94,7 +92,7 @@ async function scrapeCategory(categoryUrl) {
   console.log(`🎉 Finished category ${categoryUrl} — total ${totalScraped} products scraped`);
 }
 
-// 🔹 All categories
+// Categories (same as your list)
 const categories = [
   "https://allairaircon.co.za/product-category/airconditioner/",
   "https://allairaircon.co.za/product-category/appliance-spares/",
@@ -119,11 +117,11 @@ const categories = [
   "https://allairaircon.co.za/product-category/condensation-pump/",
 ];
 
-// 🔹 Runner
+// Runner
 (async () => {
   try {
-    await connectDB();
-    console.log("✅ Connected to MongoDB");
+    await connectDB(); // logs host & DB
+    console.log("✅ Connected to MongoDB, starting scraping...");
 
     for (const cat of categories) {
       await scrapeCategory(cat);
@@ -136,4 +134,3 @@ const categories = [
     process.exit(1);
   }
 })();
-
