@@ -1,35 +1,27 @@
-// backend/routes/emailRoutes.js
 const express = require("express");
-const nodemailer = require("nodemailer");
+const { MailerSend, EmailParams, Sender, Recipient } = require("mailersend");
 
 const router = express.Router();
+const mailerSend = new MailerSend({
+  apiKey: process.env.MAILERSEND_API_KEY,
+});
 
 router.post("/send-confirmation", async (req, res) => {
   const { name, email, total, address, cart } = req.body;
 
   try {
-    // Create transporter
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-
-    // Create formatted HTML cart summary
     const cartItemsHtml = cart
-      .map(
-        (item) =>
-          `<tr>
-             <td style="padding:5px 10px;">${item.name}</td>
-             <td style="padding:5px 10px; text-align:center;">${item.quantity}</td>
-             <td style="padding:5px 10px; text-align:right;">R${(
-               item.price * item.quantity
-             ).toFixed(2)}</td>
-           </tr>`
+      ?.map(
+        (item) => `
+        <tr>
+          <td style="padding:5px 10px;">${item.name}</td>
+          <td style="padding:5px 10px; text-align:center;">${item.quantity}</td>
+          <td style="padding:5px 10px; text-align:right;">R${(
+            item.price * item.quantity
+          ).toFixed(2)}</td>
+        </tr>`
       )
-      .join("");
+      .join("") || "";
 
     const htmlMessage = `
       <div style="font-family: 'Orbitron', sans-serif; color:#0f172a; background:#e0f7ff; padding:20px;">
@@ -45,9 +37,7 @@ router.post("/send-confirmation", async (req, res) => {
               <th style="padding:5px 10px; text-align:right;">Price</th>
             </tr>
           </thead>
-          <tbody>
-            ${cartItemsHtml}
-          </tbody>
+          <tbody>${cartItemsHtml}</tbody>
         </table>
 
         <p><strong>Delivery Address:</strong> ${address}</p>
@@ -58,14 +48,20 @@ router.post("/send-confirmation", async (req, res) => {
       </div>
     `;
 
-    // Send the email
-    await transporter.sendMail({
-      from: `"Cold Company" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "Your Cold Company Order Confirmation",
-      text: `Hi ${name}, thank you for your order! Total: R${total.toFixed(2)}`,
-      html: htmlMessage,
-    });
+    const sentFrom = new Sender(process.env.SENDER_EMAIL, process.env.SENDER_NAME);
+    const recipients = [
+      new Recipient(email, name), // Customer
+      new Recipient(process.env.SENDER_EMAIL, "Cold Company"), // Company copy
+    ];
+
+    const emailParams = new EmailParams()
+      .setFrom(sentFrom)
+      .setTo(recipients)
+      .setSubject("Your Cold Company Order Confirmation")
+      .setText(`Hi ${name}, thank you for your order! Total: R${total.toFixed(2)}`)
+      .setHtml(htmlMessage);
+
+    await mailerSend.email.send(emailParams);
 
     res.status(200).json({ success: true });
   } catch (error) {
