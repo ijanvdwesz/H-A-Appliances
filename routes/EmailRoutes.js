@@ -50,10 +50,10 @@ router.post("/send-confirmation", async (req, res) => {
 
     const sentFrom = new Sender(process.env.SENDER_EMAIL, process.env.SENDER_NAME);
     const recipients = [
-      new Recipient(email, name), // Customer
-      new Recipient(process.env.SENDER_EMAIL, "Cold Company"), // Company copy
+      new Recipient(email, name),
+      new Recipient(process.env.SENDER_EMAIL, "H&A Aplliances"),
     ];
-
+console.log("Recipients:", recipients.map(r => r.email));
     const emailParams = new EmailParams()
       .setFrom(sentFrom)
       .setTo(recipients)

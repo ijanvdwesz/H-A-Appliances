@@ -56,10 +56,10 @@ router.post("/", async (req, res) => {
     const sentFrom = new Sender(process.env.SENDER_EMAIL, process.env.SENDER_NAME);
 
     const recipients = [
-      new Recipient(data.email, data.name), // customer
-      new Recipient(process.env.SENDER_EMAIL, "Cold Company"), // company copy
+      new Recipient(data.email, data.name),
+      new Recipient(process.env.SENDER_EMAIL, "H&A Appliances"),
     ];
-
+console.log("Recipients:", recipients.map(r => r.email));
     const emailParams = new EmailParams()
       .setFrom(sentFrom)
       .setTo(recipients)
