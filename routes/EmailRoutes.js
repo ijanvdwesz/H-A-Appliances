@@ -49,19 +49,26 @@ router.post("/send-confirmation", async (req, res) => {
     `;
 
     const sentFrom = new Sender(process.env.SENDER_EMAIL, process.env.SENDER_NAME);
-    const recipients = [
-      new Recipient(email, name),
-      new Recipient(process.env.SENDER_EMAIL, "H&A Aplliances"),
-    ];
-console.log("Recipients:", recipients.map(r => r.email));
-    const emailParams = new EmailParams()
-      .setFrom(sentFrom)
-      .setTo(recipients)
-      .setSubject("Your Cold Company Order Confirmation")
-      .setText(`Hi ${name}, thank you for your order! Total: R${total.toFixed(2)}`)
-      .setHtml(htmlMessage);
 
-    await mailerSend.email.send(emailParams);
+    // ✅ Send to customer
+    await mailerSend.email.send(
+      new EmailParams()
+        .setFrom(sentFrom)
+        .setTo([new Recipient(email, name)])
+        .setSubject("Your Cold Company Order Confirmation")
+        .setText(`Hi ${name}, thank you for your order! Total: R${total.toFixed(2)}`)
+        .setHtml(htmlMessage)
+    );
+
+    // ✅ Send to company
+    await mailerSend.email.send(
+      new EmailParams()
+        .setFrom(sentFrom)
+        .setTo([new Recipient(process.env.SENDER_EMAIL, "H&A Appliances")])
+        .setSubject("New Order Notification")
+        .setText(`New order from ${name}, total R${total.toFixed(2)}`)
+        .setHtml(htmlMessage)
+    );
 
     res.status(200).json({ success: true });
   } catch (error) {

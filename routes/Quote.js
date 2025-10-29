@@ -10,7 +10,7 @@ const mailerSend = new MailerSend({
 router.post("/", async (req, res) => {
   const data = req.body;
 
-  // ✅ Save quote data to MongoDB
+  // Save quote data to MongoDB
   try {
     await Quote.create(data);
   } catch (dbError) {
@@ -18,7 +18,7 @@ router.post("/", async (req, res) => {
     return res.status(500).json({ success: false, error: "Database error" });
   }
 
-  // ✅ Build the HTML email
+  // Build the HTML email
   const htmlContent = `
     <div style="font-family:Arial, sans-serif; padding:20px; color:#333;">
       <h2 style="color:#0ea5e9;">New Quote Request</h2>
@@ -52,22 +52,28 @@ router.post("/", async (req, res) => {
     </div>
   `;
 
+  const sentFrom = new Sender(process.env.SENDER_EMAIL, process.env.SENDER_NAME);
+
   try {
-    const sentFrom = new Sender(process.env.SENDER_EMAIL, process.env.SENDER_NAME);
+    // ✅ Send to customer
+    await mailerSend.email.send(
+      new EmailParams()
+        .setFrom(sentFrom)
+        .setTo([new Recipient(data.email, data.name)])
+        .setSubject("Your Quote Request - Cold Company")
+        .setText(`Hi ${data.name}, we received your quote request.`)
+        .setHtml(htmlContent)
+    );
 
-    const recipients = [
-      new Recipient(data.email, data.name),
-      new Recipient(process.env.SENDER_EMAIL, "H&A Appliances"),
-    ];
-console.log("Recipients:", recipients.map(r => r.email));
-    const emailParams = new EmailParams()
-      .setFrom(sentFrom)
-      .setTo(recipients)
-      .setSubject("New Quote Request - Cold Company")
-      .setText(`New quote request from ${data.name}`)
-      .setHtml(htmlContent);
-
-    await mailerSend.email.send(emailParams);
+    // ✅ Send to company
+    await mailerSend.email.send(
+      new EmailParams()
+        .setFrom(sentFrom)
+        .setTo([new Recipient(process.env.SENDER_EMAIL, "H&A Appliances")])
+        .setSubject("New Quote Request")
+        .setText(`New quote request from ${data.name}`)
+        .setHtml(htmlContent)
+    );
 
     res.json({ success: true });
   } catch (error) {
