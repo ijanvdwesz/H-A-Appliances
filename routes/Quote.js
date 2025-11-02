@@ -1,22 +1,18 @@
 const express = require("express");
-const nodemailer = require("nodemailer");
+const Brevo = require("@getbrevo/brevo");
 const Quote = require("../models/Quote");
 require("dotenv").config();
 
 const router = express.Router();
 
-// Nodemailer transporter with Brevo SMTP
-const transporter = nodemailer.createTransport({
-  host: "smtp-relay.brevo.com",
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.SENDER_EMAIL,
-    pass: process.env.BREVO_SMTP_KEY,
-  },
-});
+// Configure Brevo client
+const apiInstance = new Brevo.TransactionalEmailsApi();
+apiInstance.setApiKey(
+  Brevo.TransactionalEmailsApiApiKeys.apiKey,
+  process.env.BREVO_API_KEY
+);
 
-// Send quote request email
+// ---------- QUOTE REQUEST ----------
 router.post("/", async (req, res) => {
   const data = req.body;
 
@@ -61,27 +57,27 @@ router.post("/", async (req, res) => {
   `;
 
   try {
-    // Email to customer
-    await transporter.sendMail({
-      from: `"${process.env.SENDER_NAME}" <${process.env.SENDER_EMAIL}>`,
-      to: data.email,
+    // Send to customer
+    await apiInstance.sendTransacEmail({
+      sender: { email: process.env.SENDER_EMAIL, name: process.env.SENDER_NAME },
+      to: [{ email: data.email, name: data.name }],
       subject: "Your Quote Request - Cold Company",
-      text: `Hi ${data.name}, we received your quote request.`,
-      html: htmlContent,
+      htmlContent,
+      textContent: `Hi ${data.name}, we received your quote request.`,
     });
 
-    // Email to company
-    await transporter.sendMail({
-      from: `"${process.env.SENDER_NAME}" <${process.env.SENDER_EMAIL}>`,
-      to: process.env.SENDER_EMAIL,
+    // Send to company
+    await apiInstance.sendTransacEmail({
+      sender: { email: process.env.SENDER_EMAIL, name: process.env.SENDER_NAME },
+      to: [{ email: process.env.SENDER_EMAIL, name: "H&A Appliances" }],
       subject: "New Quote Request",
-      text: `New quote request from ${data.name}`,
-      html: htmlContent,
+      htmlContent,
+      textContent: `New quote request from ${data.name}`,
     });
 
     res.json({ success: true });
   } catch (error) {
-    console.error("❌ Email send failed:", error);
+    console.error("❌ Brevo email error:", error);
     res.status(500).json({ success: false, error: "Failed to send email" });
   }
 });
