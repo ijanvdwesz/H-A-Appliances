@@ -1,21 +1,25 @@
 const express = require("express");
-const Brevo = require("@getbrevo/brevo");
+const nodemailer = require("nodemailer");
 const Quote = require("../models/Quote");
 require("dotenv").config();
 
 const router = express.Router();
 
-// Configure Brevo client
-const apiInstance = new Brevo.TransactionalEmailsApi();
-apiInstance.setApiKey(
-  Brevo.TransactionalEmailsApiApiKeys.apiKey,
-  process.env.BREVO_API_KEY
-);
+// Nodemailer transporter with Brevo SMTP
+const transporter = nodemailer.createTransport({
+  host: "smtp-relay.brevo.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.SENDER_EMAIL,
+    pass: process.env.BREVO_SMTP_KEY,
+  },
+});
 
+// Send quote request email
 router.post("/", async (req, res) => {
   const data = req.body;
 
-  // Save quote data to MongoDB
   try {
     await Quote.create(data);
   } catch (dbError) {
@@ -23,7 +27,6 @@ router.post("/", async (req, res) => {
     return res.status(500).json({ success: false, error: "Database error" });
   }
 
-  // Build the HTML email
   const htmlContent = `
     <div style="font-family:Arial, sans-serif; padding:20px; color:#333;">
       <h2 style="color:#0ea5e9;">New Quote Request</h2>
@@ -58,27 +61,27 @@ router.post("/", async (req, res) => {
   `;
 
   try {
-    // ✅ Send to customer
-    await apiInstance.sendTransacEmail({
-      sender: { email: process.env.SENDER_EMAIL, name: process.env.SENDER_NAME },
-      to: [{ email: data.email, name: data.name }],
+    // Email to customer
+    await transporter.sendMail({
+      from: `"${process.env.SENDER_NAME}" <${process.env.SENDER_EMAIL}>`,
+      to: data.email,
       subject: "Your Quote Request - Cold Company",
-      htmlContent,
-      textContent: `Hi ${data.name}, we received your quote request.`,
+      text: `Hi ${data.name}, we received your quote request.`,
+      html: htmlContent,
     });
 
-    // ✅ Send to company
-    await apiInstance.sendTransacEmail({
-      sender: { email: process.env.SENDER_EMAIL, name: process.env.SENDER_NAME },
-      to: [{ email: process.env.SENDER_EMAIL, name: "H&A Appliances" }],
+    // Email to company
+    await transporter.sendMail({
+      from: `"${process.env.SENDER_NAME}" <${process.env.SENDER_EMAIL}>`,
+      to: process.env.SENDER_EMAIL,
       subject: "New Quote Request",
-      htmlContent,
-      textContent: `New quote request from ${data.name}`,
+      text: `New quote request from ${data.name}`,
+      html: htmlContent,
     });
 
     res.json({ success: true });
   } catch (error) {
-    console.error("❌ Brevo email error:", error);
+    console.error("❌ Email send failed:", error);
     res.status(500).json({ success: false, error: "Failed to send email" });
   }
 });
