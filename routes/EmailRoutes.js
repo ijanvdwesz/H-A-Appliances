@@ -4,12 +4,9 @@ require("dotenv").config();
 
 const router = express.Router();
 
-// Configure Brevo client
+// ✅ Correct Brevo setup
 const apiInstance = new Brevo.TransactionalEmailsApi();
-apiInstance.setApiKey(
-  Brevo.TransactionalEmailsApiApiKeys.apiKey,
-  process.env.BREVO_API_KEY
-);
+apiInstance.authentications["apiKey"].apiKey = process.env.BREVO_API_KEY;
 
 // ---------- ORDER CONFIRMATION ----------
 router.post("/send-confirmation", async (req, res) => {
@@ -20,13 +17,13 @@ router.post("/send-confirmation", async (req, res) => {
       cart
         ?.map(
           (item) => `
-            <tr>
-              <td style="padding:5px 10px;">${item.name}</td>
-              <td style="padding:5px 10px; text-align:center;">${item.quantity}</td>
-              <td style="padding:5px 10px; text-align:right;">R${(
-                item.price * item.quantity
-              ).toFixed(2)}</td>
-            </tr>`
+          <tr>
+            <td style="padding:5px 10px;">${item.name}</td>
+            <td style="padding:5px 10px; text-align:center;">${item.quantity}</td>
+            <td style="padding:5px 10px; text-align:right;">R${(
+              item.price * item.quantity
+            ).toFixed(2)}</td>
+          </tr>`
         )
         .join("") || "";
 
@@ -75,7 +72,7 @@ router.post("/send-confirmation", async (req, res) => {
 
     res.status(200).json({ success: true });
   } catch (error) {
-    console.error("❌ Brevo email error:", error);
+    console.error("❌ Brevo email error:", error.response?.data || error.message);
     res.status(500).json({ success: false, error: "Failed to send email" });
   }
 });
