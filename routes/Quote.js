@@ -58,24 +58,30 @@ router.post("/", async (req, res) => {
 
   try {
     // Send email to customer
-    const customerResponse = await apiInstance.sendTransacEmail({
+    const customerResp = await apiInstance.sendTransacEmail({
       sender: { email: process.env.SENDER_EMAIL, name: process.env.SENDER_NAME },
       to: [{ email: data.email, name: data.name }],
       subject: "Your Quote Request - Cold Company",
       htmlContent,
       textContent: `Hi ${data.name}, we received your quote request.`,
     });
-    console.log("✅ Email sent to customer:", customerResponse);
+    console.log("✅ Email sent to customer:", {
+      statusCode: customerResp.response?.statusCode,
+      messageId: customerResp.body?.messageId
+    });
 
     // Send email to company
-    const companyResponse = await apiInstance.sendTransacEmail({
+    const companyResp = await apiInstance.sendTransacEmail({
       sender: { email: process.env.SENDER_EMAIL, name: process.env.SENDER_NAME },
       to: [{ email: process.env.SENDER_EMAIL, name: "H&A Appliances" }],
       subject: "New Quote Request",
       htmlContent,
       textContent: `New quote request from ${data.name}`,
     });
-    console.log("✅ Email sent to company:", companyResponse);
+    console.log("✅ Email sent to company:", {
+      statusCode: companyResp.response?.statusCode,
+      messageId: companyResp.body?.messageId
+    });
 
     res.status(200).json({ success: true });
   } catch (error) {
