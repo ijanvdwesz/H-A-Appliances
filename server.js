@@ -9,6 +9,7 @@ const emailRoutes = require("./routes/EmailRoutes");
 
 const app = express();
 
+// Enable CORS
 app.use(cors({
   origin: [
     "http://localhost:3000", // dev
@@ -17,23 +18,26 @@ app.use(cors({
   credentials: true,
 }));
 
+// Body parser
 app.use(express.json());
 
-// Routes
+// ---------- Routes ----------
 app.use("/api/products", productRoutes);
 app.use("/api/quote", quoteRoutes);
 app.use("/api", emailRoutes); // /api/send-confirmation
 
-// MongoDB connection
-mongoose
-  .connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log("✅ MongoDB connected"))
-  .catch((err) => console.error("❌ MongoDB connection error:", err));
+// Ping route for testing
+app.get("/ping", (req, res) => res.json({ message: "Backend alive ✅" }));
 
-// Root route
+// MongoDB connection
+mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log("✅ MongoDB connected"))
+  .catch(err => console.error("❌ MongoDB connection error:", err));
+
+// Root
 app.get("/", (req, res) => res.send("Cold Company API running..."));
 
-// 404 handler
+// 404
 app.use((req, res) => res.status(404).json({ message: "Endpoint not found" }));
 
 const PORT = process.env.PORT || 5000;

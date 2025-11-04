@@ -5,17 +5,17 @@ require("dotenv").config();
 
 const router = express.Router();
 
-// Configure Brevo client
+// ✅ Brevo client setup
 const apiInstance = new Brevo.TransactionalEmailsApi();
-apiInstance.setApiKey(
-  Brevo.TransactionalEmailsApiApiKeys.apiKey,
-  process.env.BREVO_API_KEY
-);
+apiInstance.authentications["apiKey"].apiKey = process.env.BREVO_API_KEY;
 
 // ---------- QUOTE REQUEST ----------
 router.post("/", async (req, res) => {
   const data = req.body;
 
+  console.log("📩 Received new quote request:", data);
+
+  // Save quote to database
   try {
     await Quote.create(data);
   } catch (dbError) {
@@ -57,28 +57,30 @@ router.post("/", async (req, res) => {
   `;
 
   try {
-    // Send to customer
-    await apiInstance.sendTransacEmail({
+    // Send email to customer
+    const customerResponse = await apiInstance.sendTransacEmail({
       sender: { email: process.env.SENDER_EMAIL, name: process.env.SENDER_NAME },
       to: [{ email: data.email, name: data.name }],
       subject: "Your Quote Request - Cold Company",
       htmlContent,
       textContent: `Hi ${data.name}, we received your quote request.`,
     });
+    console.log("✅ Email sent to customer:", customerResponse);
 
-    // Send to company
-    await apiInstance.sendTransacEmail({
+    // Send email to company
+    const companyResponse = await apiInstance.sendTransacEmail({
       sender: { email: process.env.SENDER_EMAIL, name: process.env.SENDER_NAME },
       to: [{ email: process.env.SENDER_EMAIL, name: "H&A Appliances" }],
       subject: "New Quote Request",
       htmlContent,
       textContent: `New quote request from ${data.name}`,
     });
+    console.log("✅ Email sent to company:", companyResponse);
 
-    res.json({ success: true });
+    res.status(200).json({ success: true });
   } catch (error) {
-    console.error("❌ Brevo email error:", error);
-    res.status(500).json({ success: false, error: "Failed to send email" });
+    console.error("❌ Brevo email error:", error.response?.data || error.message);
+    res.status(500).json({ success: false, error: error.response?.data || error.message });
   }
 });
 
