@@ -37,7 +37,7 @@ router.post("/send-confirmation", async (req, res) => {
         <p><strong>Delivery Address:</strong> ${address}</p>
         <p><strong>Total:</strong> R${total.toFixed(2)}</p>
         <p>We'll notify you once your order ships.</p>
-        <p>Kind regards,<br/>Cold Company Team</p>
+        <p>Kind regards,<br/>ACSystems4U team</p>
       </div>
     `;
 

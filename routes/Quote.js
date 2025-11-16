@@ -36,7 +36,7 @@ router.post("/", async (req, res) => {
           ${data.phone ? `<tr><td><b>Phone:</b></td><td>${data.phone}</td></tr>` : ""}
           ${data.location ? `<tr><td><b>Location:</b></td><td>${data.location}</td></tr>` : ""}
         </table>
-        <p style="margin-top:20px;">— Cold Company Website</p>
+        <p style="margin-top:20px;">—ACSystems4U</p>
       </div>
     `;
 
