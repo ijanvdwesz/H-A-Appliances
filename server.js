@@ -13,7 +13,8 @@ const app = express();
 app.use(cors({
   origin: [
     "http://localhost:3000", // dev
-    "https://h-a-appliances.vercel.app" // production
+    "https://h-a-appliances.vercel.app",
+    "https://acsystems4u.com" // production
   ],
   credentials: true,
 }));
