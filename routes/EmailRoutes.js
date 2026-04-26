@@ -22,13 +22,13 @@ router.post("/send-confirmation", async (req, res) => {
       : "<tr><td colspan='3'>No items</td></tr>";
 
     const htmlMessage = `
-      <div style="font-family:'Orbitron',sans-serif; color:#0f172a; background:#e0f7ff; padding:20px;">
-        <h2 style="color:#38bdf8;">Hi ${name},</h2>
+      <div style="font-family:'Orbitron',sans-serif; color:#0F5FBF; background:#e0f7ff; padding:20px;">
+        <h2 style="color:#4DB8FF;">Hi ${name},</h2>
         <p>Thank you for your order! 🧊</p>
-        <h3 style="color:#0ea5e9;">Order Summary:</h3>
+        <h3 style="color:#0b5ed7;">Order Summary:</h3>
         <table style="width:100%; border-collapse: collapse; margin-bottom:15px;">
           <thead>
-            <tr style="background:#38bdf8; color:#0f172a;">
+            <tr style="background:#4DB8FF; color:#0F5FBF;">
               <th>Product</th><th>Qty</th><th>Price</th>
             </tr>
           </thead>

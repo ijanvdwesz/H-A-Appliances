@@ -5,132 +5,208 @@ const slugify = require("slugify");
 const Product = require("./models/Product");
 const connectDB = require("./config/db");
 
-// Helper: calculate adjusted price
+// ---------------- CONFIG ----------------
+const BASE_URL = "https://allairaircon.co.za";
+const START_URL = `${BASE_URL}/shop/`;
+
+const HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  "Accept-Language": "en-US,en;q=0.9",
+  Connection: "keep-alive",
+};
+
+// ---------------- PRICE LOGIC ----------------
 function applyMarkup(price) {
-  if (price >= 1000) return +(price * 1.15).toFixed(2);
-  if (price >= 500) return +(price * 1.20).toFixed(2);
-  return +(price * 1.30).toFixed(2);
+  if (price >= 1000) return price * 1.15;
+  if (price >= 500) return price * 1.2;
+  return price * 1.3;
 }
 
-// Helper: upsert product
+// ---------------- NORMALIZER ----------------
+function normalizeProduct(raw) {
+  const cleanPrice = Number(raw.price.toFixed(2));
+  const markedUp = Number(applyMarkup(cleanPrice).toFixed(2));
+
+  return {
+    title: raw.title.trim(),
+    slug: slugify(raw.title, { lower: true }),
+    productCode: raw.productCode || "N/A",
+    price: markedUp,
+    originalPrice: cleanPrice,
+    image: raw.image?.startsWith("http")
+      ? raw.image
+      : `${BASE_URL}${raw.image}`,
+    sourceUrl: raw.sourceUrl,
+    stockStatus: "dropship",
+    category: raw.category || "general",
+  };
+}
+
+// ---------------- DB SAVE ----------------
 async function saveOrUpdateProduct(prod) {
   try {
-    const updated = await Product.findOneAndUpdate(
-      { slug: prod.slug }, // always use slug
+    await Product.findOneAndUpdate(
+      { slug: prod.slug },
       { $set: prod },
       { upsert: true, new: true }
     );
 
-    console.log(`✅ Saved/Updated: ${prod.title} → R${prod.price.toFixed(2)}`);
+    console.log(`✅ ${prod.title} → R${prod.price}`);
   } catch (err) {
-    console.error(`❌ Error saving product: ${prod.title}`, err.message);
+    console.error("❌ DB Error:", err.message);
   }
 }
 
-// Scrape category
-async function scrapeCategory(categoryUrl) {
-  let page = 1;
-  let totalScraped = 0;
+// ---------------- FETCH HTML ----------------
+async function fetch(url) {
+  try {
+    const res = await axios.get(url, {
+      headers: HEADERS,
+      timeout: 15000,
+      validateStatus: () => true,
+    });
 
-  while (true) {
-    const url = page === 1 ? categoryUrl : `${categoryUrl}page/${page}/`;
-    console.log(`🌐 Scraping ${url}`);
+    if (res.status !== 200) {
+      console.log(`⚠️ Skipping ${url} (status ${res.status})`);
+      return null;
+    }
 
-    try {
-      const { data } = await axios.get(url, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-        },
-      });
+    const html = res.data;
 
-      const $ = cheerio.load(data);
-      const products = [];
+    if (
+      !html ||
+      html.length < 5000 ||
+      html.toLowerCase().includes("not found")
+    ) {
+      console.log(`⚠️ Invalid or blocked page: ${url}`);
+      return null;
+    }
 
-      $("li.product.type-product").each((i, el) => {
-        const title = $(el).find("h2.woocommerce-loop-product__title").text().trim();
-        const productUrl = $(el).find("a.woocommerce-LoopProduct-link").attr("href");
-        let price = parseFloat($(el).find("span.woocommerce-Price-amount bdi").first().text().replace(/[^0-9.]/g, "")) || 0;
-        price = Number(price.toFixed(2));
+    return html;
+  } catch (err) {
+    console.log(`❌ Request failed: ${url}`);
+    return null;
+  }
+}
 
-        const image = $(el).find("img").attr("src") || "";
-        const skuText = $(el).find(".product-sku").text().replace("SKU:", "").trim();
-        const slug = slugify(title, { lower: true });
-        const description = $(el).find(".product-short-description").text().trim() || "";
+// ---------------- EXTRACT PRODUCTS ----------------
+function extractProducts($, currentUrl) {
+  const products = [];
 
-        if (title && price > 0) {
-          const adjustedPrice = Number(applyMarkup(price).toFixed(2));
+  $("li.product, .product").each((_, el) => {
+    const title =
+      $(el)
+        .find(".woocommerce-loop-product__title, h2")
+        .first()
+        .text()
+        .trim();
 
-          products.push({
-            title,
-            slug,
-            productCode: skuText || "N/A",
-            price: adjustedPrice,
-            originalPrice: price,
-            image,
-            description,
-            sourceUrl: productUrl,
-            stockStatus: "dropship",
-            category: categoryUrl.split("/product-category/")[1]?.replace(/\//g, ""),
-          });
-        }
-      });
+    const link =
+      $(el)
+        .find("a.woocommerce-LoopProduct-link, a")
+        .attr("href") || "";
 
-      if (products.length === 0) break;
+    const priceText =
+      $(el)
+        .find(".woocommerce-Price-amount bdi")
+        .first()
+        .text()
+        .replace(/[^0-9.]/g, "");
 
-      for (const prod of products) await saveOrUpdateProduct(prod);
+    const price = parseFloat(priceText);
 
-      totalScraped += products.length;
-      console.log(`✅ Scraped ${products.length} products from page ${page}`);
-      page++;
-    } catch (err) {
-      console.error("❌ Error scraping:", err.message);
-      break;
+    const image =
+      $(el).find("img").attr("src") ||
+      $(el).find("img").attr("data-src") ||
+      "";
+
+    const sku =
+      $(el).find(".sku, .product-sku").text().trim();
+
+    if (!title || !price || price <= 0) return;
+
+    products.push(
+      normalizeProduct({
+        title,
+        price,
+        image,
+        sourceUrl: link,
+        productCode: sku,
+        category: currentUrl.split("/shop/")[1] || "general",
+      })
+    );
+  });
+
+  return products;
+}
+
+// ---------------- SCRAPE PAGE ----------------
+async function scrapePage(url) {
+  const html = await fetch(url);
+  if (!html) return { products: [], nextPage: null };
+
+  const $ = cheerio.load(html);
+
+  const products = extractProducts($, url);
+
+  let nextPage =
+    $(".next.page-numbers").attr("href") ||
+    $("a.next").attr("href") ||
+    null;
+
+  return { products, nextPage };
+}
+
+// ---------------- MAIN SCRAPER ----------------
+async function scrapeAll() {
+  const visited = new Set();
+  const queue = [START_URL];
+  let total = 0;
+
+  while (queue.length) {
+    const url = queue.shift();
+
+    if (!url || visited.has(url)) continue;
+    visited.add(url);
+
+    console.log(`🌐 Visiting: ${url}`);
+
+    const { products, nextPage } = await scrapePage(url);
+
+    if (!products.length) {
+      console.log("⚠️ No products found");
+      continue;
+    }
+
+    for (const product of products) {
+      await saveOrUpdateProduct(product);
+    }
+
+    total += products.length;
+    console.log(`✅ ${products.length} products processed`);
+
+    if (nextPage && !visited.has(nextPage)) {
+      queue.push(nextPage);
     }
   }
 
-  console.log(`🎉 Finished category ${categoryUrl} — total ${totalScraped} products scraped`);
+  console.log(`🎯 DONE — Total: ${total} products`);
 }
 
-// Categories (same as your list)
-const categories = [
-  "https://allairaircon.co.za/product-category/airconditioner/",
-  "https://allairaircon.co.za/product-category/appliance-spares/",
-  "https://allairaircon.co.za/product-category/compressors/",
-  "https://allairaircon.co.za/product-category/electrical/",
-  "https://allairaircon.co.za/product-category/fans/",
-  "https://allairaircon.co.za/product-category/filter-driers/",
-  "https://allairaircon.co.za/product-category/fridge-coldroom-accessories/",
-  "https://allairaircon.co.za/product-category/gas-oil/",
-  "https://allairaircon.co.za/product-category/sales-items/",
-  "https://allairaircon.co.za/product-category/shoes/",
-  "https://allairaircon.co.za/product-category/tape-pvc-trunking-screws/",
-  "https://allairaircon.co.za/product-category/tools-and-multi-meters/",
-  "https://allairaircon.co.za/product-category/tubing-fitting-armaflex/",
-  "https://allairaircon.co.za/product-category/valves/",
-  "https://allairaircon.co.za/product-category/aircon-accessories/",
-  "https://allairaircon.co.za/product-category/aircon-spares/",
-  "https://allairaircon.co.za/product-category/sensors/",
-  "https://allairaircon.co.za/product-category/brackets/",
-  "https://allairaircon.co.za/product-category/universal-pc-board/",
-  "https://allairaircon.co.za/product-category/universal-remote/",
-  "https://allairaircon.co.za/product-category/condensation-pump/",
-];
-
-// Runner
+// ---------------- RUNNER ----------------
 (async () => {
   try {
-    await connectDB(); // logs host & DB
-    console.log("✅ Connected to MongoDB, starting scraping...");
+    await connectDB();
+    console.log("✅ MongoDB connected");
 
-    for (const cat of categories) {
-      await scrapeCategory(cat);
-    }
+    await scrapeAll();
 
-    console.log("🎯 Scraping finished for all categories!");
+    console.log("🚀 SCRAPING COMPLETE");
     process.exit(0);
   } catch (err) {
-    console.error("❌ Scraper failed:", err.message);
+    console.error("❌ Fatal error:", err.message);
     process.exit(1);
   }
 })();
